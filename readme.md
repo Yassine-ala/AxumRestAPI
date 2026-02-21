@@ -2,55 +2,64 @@
 
 ## Why this repository exists
 
-This repository is my personal playground for learning and mastering backend development in **Rust**, starting with the **Axum** web framework.
+This repository is my personal playground for learning and mastering backend development in **Rust**, using **Axum**, **PostgreSQL**, and **sqlx**.
 
-As a software engineer primarily experienced in frontend development, I’m building this project to:
+As a software engineer with a strong frontend background, this project is focused on:
 
-- Strengthen my backend fundamentals
-- Deepen my understanding of Rust’s async model
-- Explore modern Rust web tooling (Axum, Tokio, Serde)
-- Practice clean API design and structured project setup
-- Build toward production-ready Rust services
+- Building real backend fundamentals
+- Understanding Rust’s async model in practice
+- Writing explicit SQL instead of relying on heavy abstractions
+- Designing clean HTTP APIs with proper error handling
+- Managing infrastructure locally using Docker
 
----
-
-## Current Scope
-
-Initial minimal API setup:
-
-- `GET /health` → basic health check
-- `GET /json` → simple JSON response
-
-### Tech stack
-
-- **Axum**
-- **Tokio** (async runtime)
-- **Serde** (serialization)
+The goal is not just to make things work, but to understand the mechanisms behind them.
 
 ---
 
-## Goals
+## Current State
 
-This repository will progressively evolve to include:
+The project currently exposes a simple but complete CRUD API around a `Patient` entity.
 
-- Request extractors
-- Shared application state
-- Middleware (logging, CORS)
-- Error handling patterns
-- Structured logging (tracing)
-- Project architecture improvements
-- Possibly database integration
+### Patient Model
 
-The objective is not just to “make it work”, but to understand the design philosophy behind Rust web services and write idiomatic, maintainable code.
+- `id` (UUID)
+- `first_name`
+- `last_name`
+- `birth_date`
+- `email` (optional, unique)
+- `created_at`
+- `updated_at`
+
+### Available Operations
+
+- `POST /patients` → Create a patient
+- `GET /patients` → List patients (supports `?search=` query param)
+- `GET /patients/{id}` → Retrieve a specific patient
+- `PUT /patients/{id}` → Partially update a patient
+- `DELETE /patients/{id}` → Delete a patient
+
+The API uses:
+
+- Typed DTOs for input
+- Explicit SQL queries via `sqlx`
+- Structured error handling mapped to proper HTTP status codes
+- PostgreSQL migrations managed through `sqlx-cli`
+- Environment-based configuration via `.env` (local development)
+
+All requests are tested through a Postman collection using environment variables and request chaining.
 
 ---
 
-## Run locally
+## Running Locally
+
+Start the database:
 
 ```bash
-cargo run
+docker compose up -d
 ```
 
-Then visit
-- http://127.0.0.1:3000/health
-- http://127.0.0.1:3000/json
+cargo run to start the api at:
+```bash
+http://127.0.0.1:3000
+```
+
