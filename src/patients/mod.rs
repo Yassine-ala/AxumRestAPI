@@ -87,7 +87,7 @@ fn map_sqlx_error(e: sqlx::Error) -> ApiError {
 async fn create_patient(
     State(state): State<AppState>,
     Json(dto): Json<CreatePatientDto>,
-) -> Result<Json<Patient>, ApiError> {
+) -> Result<(StatusCode, Json<Patient>), ApiError> {
     let p = sqlx::query_as!(
         Patient,
         r#"
@@ -104,7 +104,7 @@ async fn create_patient(
         .await
         .map_err(map_sqlx_error)?;
 
-    Ok(Json(p))
+    Ok((StatusCode::CREATED, Json(p)))
 }
 
 async fn get_patient(

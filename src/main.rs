@@ -1,37 +1,18 @@
-use axum::{routing::get, Router};
-use sqlx::postgres::PgPoolOptions;
-use std::net::SocketAddr;
-
-mod patients;
-
-#[derive(Clone)]
-pub struct AppState {
-    pub db: sqlx::PgPool,
-}
+use axum_api::{app, AppState}; // assuming you create lib.rs as shown below
+use sqlx::PgPool;
+use tokio::net::TcpListener;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
-    // Read DATABASE_URL
-    let database_url =
-            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set (use .env)");
-
-    // Create pool
-    let db = PgPoolOptions::new()
-        .max_connections(10)
-        .connect(&database_url)
-        .await
-        .expect("failed to connect to Postgres");
-
+    let db = PgPool::connect(&std::env::var("DATABASE_URL")?).await?;
     let state = AppState { db };
 
-    let app = Router::new()
-        .route("/health", get(|| async { "ok" }))
-        .nest("/patients", patients::router())
-        .with_state(state);
+    let app = app(state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:3000").await?;
+    axum::serve(listener, app).await?;
+
+    Ok(())
 }

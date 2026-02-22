@@ -81,13 +81,17 @@ dependencies = [
 name = "axum-api"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "axum",
  "chrono",
  "dotenvy",
+ "http-body-util",
  "serde",
+ "serde_json",
  "sqlx",
  "thiserror",
  "tokio",
+ "tower",
  "uuid",
 ]
 
