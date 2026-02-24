@@ -1,9 +1,9 @@
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{get, post},
-    Json, Router,
+    routing::{get},
 };
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -11,12 +11,12 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::AppState;
-use crate::common::validation::email::{validate_email_opt, EmailValidationError};
+use crate::common::validation::email::{EmailValidationError, validate_email_opt};
 
-pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/", post(create_patient).get(list_patients))
-        .route("/{id}", get(get_patient).put(update_patient).delete(delete_patient))
+pub fn domain_router() -> Router<AppState> {
+    Router::new().route("/", get(list_patients).post(create_patient))
+        .route("/{patient_id}", get(get_patient).put(update_patient).delete(delete_patient),
+    )
 }
 
 #[derive(Debug, Serialize)]
@@ -53,7 +53,9 @@ struct ListQuery {
 
 fn map_email_err(e: EmailValidationError) -> ApiError {
     match e {
-        EmailValidationError::Empty => ApiError::BadRequest("email must be null or non-empty".into()),
+        EmailValidationError::Empty => {
+            ApiError::BadRequest("email must be null or non-empty".into())
+        }
         EmailValidationError::InvalidFormat => ApiError::BadRequest("invalid email format".into()),
     }
 }
@@ -94,16 +96,19 @@ fn map_sqlx_error(e: sqlx::Error) -> ApiError {
 
 async fn create_patient(
     State(state): State<AppState>,
+    Path(domain_id): Path<Uuid>,
     Json(dto): Json<CreatePatientDto>,
 ) -> Result<(StatusCode, Json<Patient>), ApiError> {
     validate_email_opt(&dto.email).map_err(map_email_err)?;
+
     let p = sqlx::query_as!(
         Patient,
         r#"
-        INSERT INTO patients (first_name, last_name, birth_date, email)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO patients (domain_id, first_name, last_name, birth_date, email)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING id, first_name, last_name, birth_date, email, created_at, updated_at
         "#,
+        domain_id,
         dto.first_name,
         dto.last_name,
         dto.birth_date,
@@ -118,27 +123,29 @@ async fn create_patient(
 
 async fn get_patient(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
+    Path((domain_id, patient_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<Patient>, ApiError> {
     let p = sqlx::query_as!(
         Patient,
         r#"
         SELECT id, first_name, last_name, birth_date, email, created_at, updated_at
         FROM patients
-        WHERE id = $1
+        WHERE id = $1 AND domain_id = $2
         "#,
-        id
+        patient_id,
+        domain_id
     )
-        .fetch_optional(&state.db)
-        .await
-        .map_err(map_sqlx_error)?
-        .ok_or(ApiError::NotFound)?;
+    .fetch_optional(&state.db)
+    .await
+    .map_err(map_sqlx_error)?
+    .ok_or(ApiError::NotFound)?;
 
     Ok(Json(p))
 }
 
 async fn list_patients(
     State(state): State<AppState>,
+    Path(domain_id): Path<Uuid>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<Patient>>, ApiError> {
     // Simple search by name/email. Expand later.
@@ -150,43 +157,46 @@ async fn list_patients(
         r#"
         SELECT id, first_name, last_name, birth_date, email, created_at, updated_at
         FROM patients
-        WHERE ($1 = '' OR first_name ILIKE $2 OR last_name ILIKE $2 OR email ILIKE $2)
+        WHERE domain_id = $1
+          AND ($2 = '' OR first_name ILIKE $3 OR last_name ILIKE $3 OR email ILIKE $3)
         ORDER BY created_at DESC
         LIMIT 50
         "#,
+        domain_id,
         search,
         like
     )
-        .fetch_all(&state.db)
-        .await
-        .map_err(map_sqlx_error)?;
+    .fetch_all(&state.db)
+    .await
+    .map_err(map_sqlx_error)?;
 
     Ok(Json(items))
 }
 
 async fn update_patient(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
+    Path((domain_id, patient_id)): Path<(Uuid, Uuid)>,
     Json(dto): Json<UpdatePatientDto>,
 ) -> Result<Json<Patient>, ApiError> {
     if dto.email.is_some() {
         validate_email_opt(&dto.email).map_err(map_email_err)?;
     }
-    // Update only provided fields (COALESCE trick)
+
     let p = sqlx::query_as!(
         Patient,
         r#"
         UPDATE patients
         SET
-          first_name = COALESCE($2, first_name),
-          last_name  = COALESCE($3, last_name),
-          birth_date = COALESCE($4, birth_date),
-          email      = COALESCE($5, email),
+          first_name = COALESCE($3, first_name),
+          last_name  = COALESCE($4, last_name),
+          birth_date = COALESCE($5, birth_date),
+          email      = COALESCE($6, email),
           updated_at = now()
-        WHERE id = $1
+        WHERE id = $1 AND domain_id = $2
         RETURNING id, first_name, last_name, birth_date, email, created_at, updated_at
         "#,
-        id,
+        patient_id,
+        domain_id,
         dto.first_name,
         dto.last_name,
         dto.birth_date,
@@ -202,9 +212,13 @@ async fn update_patient(
 
 async fn delete_patient(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
+    Path((domain_id, patient_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
-    let res = sqlx::query!("DELETE FROM patients WHERE id = $1", id)
+    let res = sqlx::query!(
+        "DELETE FROM patients WHERE id = $1 AND domain_id = $2",
+        patient_id,
+        domain_id
+    )
         .execute(&state.db)
         .await
         .map_err(map_sqlx_error)?;
