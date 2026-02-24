@@ -11,6 +11,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::AppState;
+use crate::common::validation::email::{validate_email_opt, EmailValidationError};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -48,6 +49,13 @@ struct UpdatePatientDto {
 #[derive(Debug, Deserialize)]
 struct ListQuery {
     search: Option<String>,
+}
+
+fn map_email_err(e: EmailValidationError) -> ApiError {
+    match e {
+        EmailValidationError::Empty => ApiError::BadRequest("email must be null or non-empty".into()),
+        EmailValidationError::InvalidFormat => ApiError::BadRequest("invalid email format".into()),
+    }
 }
 
 #[derive(Debug, Error)]
@@ -88,6 +96,7 @@ async fn create_patient(
     State(state): State<AppState>,
     Json(dto): Json<CreatePatientDto>,
 ) -> Result<(StatusCode, Json<Patient>), ApiError> {
+    validate_email_opt(&dto.email).map_err(map_email_err)?;
     let p = sqlx::query_as!(
         Patient,
         r#"
@@ -160,6 +169,9 @@ async fn update_patient(
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdatePatientDto>,
 ) -> Result<Json<Patient>, ApiError> {
+    if dto.email.is_some() {
+        validate_email_opt(&dto.email).map_err(map_email_err)?;
+    }
     // Update only provided fields (COALESCE trick)
     let p = sqlx::query_as!(
         Patient,

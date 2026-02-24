@@ -1,4 +1,5 @@
 pub mod patients;
+pub mod common;
 
 use axum::Router;
 use sqlx::PgPool;
