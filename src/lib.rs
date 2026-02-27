@@ -1,5 +1,6 @@
 pub mod patients;
 pub mod domains;
+pub mod attributes;
 pub mod common;
 
 use axum::Router;
@@ -13,5 +14,6 @@ pub struct AppState {
 pub fn app(state: AppState) -> Router {
     Router::new()
         .nest("/domains", domains::router())
+        .nest("/attributes", attributes::router())
         .with_state(state)
 }

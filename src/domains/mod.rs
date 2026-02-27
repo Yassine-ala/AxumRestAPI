@@ -6,6 +6,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::{Postgres, QueryBuilder};
 use uuid::Uuid;
 
 use crate::AppState;
@@ -39,6 +40,7 @@ struct CreateDomainDto {
     country: String,
     language: String,
     max_search_identity: i16,
+    attribute_configs: Option<Vec<AttributeConfigDto>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,13 +49,27 @@ struct UpdateDomainDto {
     country: Option<String>,
     language: Option<String>,
     max_search_identity: Option<i16>,
+    attribute_configs: Option<Vec<AttributeConfigDto>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AttributeConfigDto {
+    attribute_id: Uuid,
+    search_weight: i16,
+    search_index: i16,
+    appears_in_banner: bool,
+    mandatory_in_form: bool,
+    appears_in_search: bool,
+    mandatory_in_search: bool,
 }
 
 async fn create_domain(
     State(state): State<AppState>,
     Json(dto): Json<CreateDomainDto>,
 ) -> Result<(StatusCode, Json<Domain>), ApiError> {
-    let p = sqlx::query_as!(
+    let mut tx = state.db.begin().await.api_err()?;
+
+    let domain = sqlx::query_as!(
         Domain,
         r#"
         INSERT INTO domains (label, country, language, max_search_identity)
@@ -65,11 +81,17 @@ async fn create_domain(
         dto.language,
         dto.max_search_identity
     )
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await
     .api_err()?;
 
-    Ok((StatusCode::CREATED, Json(p)))
+    if let Some(configs) = dto.attribute_configs {
+        insert_attribute_configs(&mut tx, domain.id, configs).await?;
+    }
+
+    tx.commit().await.api_err()?;
+
+    Ok((StatusCode::CREATED, Json(domain)))
 }
 
 async fn get_domain(
@@ -115,7 +137,9 @@ async fn update_domains(
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateDomainDto>,
 ) -> Result<Json<Domain>, ApiError> {
-    let p = sqlx::query_as!(
+    let mut tx = state.db.begin().await.api_err()?;
+
+    let domain = sqlx::query_as!(
         Domain,
         r#"
         UPDATE domains
@@ -134,12 +158,24 @@ async fn update_domains(
         dto.language,
         dto.max_search_identity
     )
-    .fetch_optional(&state.db)
+    .fetch_optional(&mut *tx)
     .await
     .api_err()?
     .ok_or(ApiError::NotFound)?;
 
-    Ok(Json(p))
+    if let Some(configs) = dto.attribute_configs {
+        // replace-all
+        sqlx::query!("DELETE FROM attribute_configs WHERE domain_id = $1", id)
+            .execute(&mut *tx)
+            .await
+            .api_err()?;
+
+        insert_attribute_configs(&mut tx, id, configs).await?;
+    }
+
+    tx.commit().await.api_err()?;
+
+    Ok(Json(domain))
 }
 
 async fn delete_domain(
@@ -156,4 +192,36 @@ async fn delete_domain(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn insert_attribute_configs(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    domain_id: Uuid,
+    configs: Vec<AttributeConfigDto>,
+) -> Result<(), ApiError> {
+    if configs.is_empty() {
+        return Ok(());
+    }
+
+    let mut qb = QueryBuilder::<Postgres>::new(
+        r#"
+        INSERT INTO attribute_configs
+          (domain_id, attribute_id, search_weight, search_index, mandatory_in_form, appears_in_banner, appears_in_search, mandatory_in_search)
+        "#,
+    );
+
+    qb.push_values(configs, |mut b, c| {
+        b.push_bind(domain_id)
+            .push_bind(c.attribute_id)
+            .push_bind(c.search_weight)
+            .push_bind(c.search_index)
+            .push_bind(c.mandatory_in_form)
+            .push_bind(c.appears_in_banner)
+            .push_bind(c.appears_in_search)
+            .push_bind(c.mandatory_in_search);
+    });
+
+    qb.build().execute(&mut **tx).await.api_err()?;
+
+    Ok(())
 }
