@@ -2,15 +2,14 @@ use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
     routing::{get, post},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use uuid::Uuid;
 
 use crate::AppState;
+use crate::common::error::{ApiError, SqlxResultExt};
 use crate::patients::domain_router;
 
 pub fn router() -> Router<AppState> {
@@ -30,7 +29,6 @@ struct Domain {
     country: String,
     language: String,
     max_search_identity: i16,
-    //patients: Vec<Patient>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -51,40 +49,6 @@ struct UpdateDomainDto {
     max_search_identity: Option<i16>,
 }
 
-#[derive(Debug, Error)]
-enum ApiError {
-    #[error("not found")]
-    NotFound,
-    #[error("conflict")]
-    Conflict,
-    #[error("bad request: {0}")]
-    BadRequest(String),
-    #[error("database error")]
-    Db(#[from] sqlx::Error),
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        match self {
-            ApiError::NotFound => StatusCode::NOT_FOUND.into_response(),
-            ApiError::Conflict => StatusCode::CONFLICT.into_response(),
-            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
-            ApiError::Db(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        }
-    }
-}
-
-fn map_sqlx_error(e: sqlx::Error) -> ApiError {
-    // Unique violation -> 409
-    if let sqlx::Error::Database(db_err) = &e {
-        // 23505 = unique_violation (Postgres SQLSTATE)
-        if db_err.code().as_deref() == Some("23505") {
-            return ApiError::Conflict;
-        }
-    }
-    ApiError::Db(e)
-}
-
 async fn create_domain(
     State(state): State<AppState>,
     Json(dto): Json<CreateDomainDto>,
@@ -103,7 +67,7 @@ async fn create_domain(
     )
     .fetch_one(&state.db)
     .await
-    .map_err(map_sqlx_error)?;
+    .api_err()?;
 
     Ok((StatusCode::CREATED, Json(p)))
 }
@@ -123,7 +87,7 @@ async fn get_domain(
     )
     .fetch_optional(&state.db)
     .await
-    .map_err(map_sqlx_error)?
+    .api_err()?
     .ok_or(ApiError::NotFound)?;
 
     Ok(Json(p))
@@ -141,7 +105,7 @@ async fn list_domains(State(state): State<AppState>) -> Result<Json<Vec<Domain>>
     )
     .fetch_all(&state.db)
     .await
-    .map_err(map_sqlx_error)?;
+    .api_err()?;
 
     Ok(Json(items))
 }
@@ -172,7 +136,7 @@ async fn update_domains(
     )
     .fetch_optional(&state.db)
     .await
-    .map_err(map_sqlx_error)?
+    .api_err()?
     .ok_or(ApiError::NotFound)?;
 
     Ok(Json(p))
@@ -185,7 +149,7 @@ async fn delete_domain(
     let res = sqlx::query!("DELETE FROM domains WHERE id = $1", id)
         .execute(&state.db)
         .await
-        .map_err(map_sqlx_error)?;
+        .api_err()?;
 
     if res.rows_affected() == 0 {
         return Err(ApiError::NotFound);

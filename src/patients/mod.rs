@@ -2,16 +2,15 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
     routing::{get},
 };
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use uuid::Uuid;
 
 use crate::AppState;
 use crate::common::validation::email::{EmailValidationError, validate_email_opt};
+use crate::common::error::{ApiError, SqlxResultExt};
 
 pub fn domain_router() -> Router<AppState> {
     Router::new().route("/", get(list_patients).post(create_patient))
@@ -60,40 +59,6 @@ fn map_email_err(e: EmailValidationError) -> ApiError {
     }
 }
 
-#[derive(Debug, Error)]
-enum ApiError {
-    #[error("not found")]
-    NotFound,
-    #[error("conflict")]
-    Conflict,
-    #[error("bad request: {0}")]
-    BadRequest(String),
-    #[error("database error")]
-    Db(#[from] sqlx::Error),
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        match self {
-            ApiError::NotFound => StatusCode::NOT_FOUND.into_response(),
-            ApiError::Conflict => StatusCode::CONFLICT.into_response(),
-            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg).into_response(),
-            ApiError::Db(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        }
-    }
-}
-
-fn map_sqlx_error(e: sqlx::Error) -> ApiError {
-    // Unique violation -> 409
-    if let sqlx::Error::Database(db_err) = &e {
-        // 23505 = unique_violation (Postgres SQLSTATE)
-        if db_err.code().as_deref() == Some("23505") {
-            return ApiError::Conflict;
-        }
-    }
-    ApiError::Db(e)
-}
-
 async fn create_patient(
     State(state): State<AppState>,
     Path(domain_id): Path<Uuid>,
@@ -116,7 +81,7 @@ async fn create_patient(
     )
         .fetch_one(&state.db)
         .await
-        .map_err(map_sqlx_error)?;
+        .api_err()?;
 
     Ok((StatusCode::CREATED, Json(p)))
 }
@@ -137,7 +102,7 @@ async fn get_patient(
     )
     .fetch_optional(&state.db)
     .await
-    .map_err(map_sqlx_error)?
+    .api_err()?
     .ok_or(ApiError::NotFound)?;
 
     Ok(Json(p))
@@ -168,7 +133,7 @@ async fn list_patients(
     )
     .fetch_all(&state.db)
     .await
-    .map_err(map_sqlx_error)?;
+    .api_err()?;
 
     Ok(Json(items))
 }
@@ -204,7 +169,7 @@ async fn update_patient(
     )
         .fetch_optional(&state.db)
         .await
-        .map_err(map_sqlx_error)?
+        .api_err()?
         .ok_or(ApiError::NotFound)?;
 
     Ok(Json(p))
@@ -221,7 +186,7 @@ async fn delete_patient(
     )
         .execute(&state.db)
         .await
-        .map_err(map_sqlx_error)?;
+        .api_err()?;
 
     if res.rows_affected() == 0 {
         return Err(ApiError::NotFound);
