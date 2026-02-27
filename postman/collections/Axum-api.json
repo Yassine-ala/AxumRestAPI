@@ -1,0 +1,423 @@
+{
+  "info": {
+    "_postman_id": "ae0e06ac-403f-4136-9d03-e4a392dea0ee",
+    "name": "Axum-api",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52587659",
+    "_collection_link": "https://go.postman.co/collection/52587659-ae0e06ac-403f-4136-9d03-e4a392dea0ee?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "patients",
+      "item": [
+        {
+          "name": "patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "pm.environment.set(\"patient_id\", response.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Bob\",\n  \"last_name\": \"Dylan\",\n  \"birth_date\": \"1995-10-23\",\n  \"email\": \"bob.dylan@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_api}}/domains/{{domain_id}}/patients",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains",
+                "{{domain_id}}",
+                "patients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "patient",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_api}}/domains/{{domain_id}}/patients/{{patient_id}}",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains",
+                "{{domain_id}}",
+                "patients",
+                "{{patient_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.environment.unset(\"patient_id\");"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"birth_date\": \"1990-05-12\",\n  \"email\": \"john@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_api}}/domains/{{domain_id}}/patients/{{patient_id}}",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains",
+                "{{domain_id}}",
+                "patients",
+                "{{patient_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "patients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_api}}/domains/{{domain_id}}/patients?search=doe",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains",
+                "{{domain_id}}",
+                "patients"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "doe"
+                }
+              ]
+            },
+            "description": "Generated from cURL: curl --request GET '{{base_api}}/domains/{{domain_id}}/patients?search=doe'"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "domains",
+      "item": [
+        {
+          "name": "domains",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Bob\",\n  \"last_name\": \"Dylan\",\n  \"birth_date\": \"1995-10-23\",\n  \"email\": \"bob.dylan@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_api}}/domains",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "domain",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_api}}/domains/{{domain_id}}",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains",
+                "{{domain_id}}"
+              ]
+            },
+            "description": "Generated from cURL: curl --request GET '{{base_api}}/domains/{{domain_id}}'"
+          },
+          "response": []
+        },
+        {
+          "name": "domain",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "pm.environment.set(\"domain_id\", response.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"label\": \"Sample\",\n    \"country\": \"Scotland\",\n    \"language\": \"English\",\n    \"max_search_identity\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_api}}/domains",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "domain w attributes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "pm.environment.set(\"domain_id\", response.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"label\": \"Sample\",\n    \"country\": \"Scotland\",\n    \"language\": \"English\",\n    \"max_search_identity\": 50,\n    \"attribute_configs\": [{\n        \"attribute_id\": \"{{attribute_id}}\",\n        \"search_weight\": 5,\n        \"search_index\": 1,\n        \"appears_in_banner\": true,\n        \"mandatory_in_form\": true,\n        \"appears_in_search\": true,\n        \"mandatory_in_search\": false\n    }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_api}}/domains",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "domain",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.environment.unset(\"domain_id\");"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"label\": \"Sample\",\n    \"country\": \"Scotland\",\n    \"language\": \"English\",\n    \"max_search_identity\": 50,\n}"
+            },
+            "url": {
+              "raw": "{{base_api}}/domains/{{domain_id}}",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "domains",
+                "{{domain_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "attributes",
+      "item": [
+        {
+          "name": "attributes",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Bob\",\n  \"last_name\": \"Dylan\",\n  \"birth_date\": \"1995-10-23\",\n  \"email\": \"bob.dylan@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_api}}/attributes",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "attributes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "attribute",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_api}}/attributes/{{attribute_id}}",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "attributes",
+                "{{attribute_id}}"
+              ]
+            },
+            "description": "Generated from cURL: curl --request GET '{{base_api}}/domains/{{domain_id}}'"
+          },
+          "response": []
+        },
+        {
+          "name": "attribute",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "pm.environment.set(\"attribute_id\", response.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"key\": \"1.22.14.401\",\n    \"label\": \"firstName\",\n    \"description\": \"Optional field\",\n    \"data_type\": \"TEXT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_api}}/attributes",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "attributes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "attribute",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.environment.unset(\"attribute_id\");"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_api}}/attributes/{{attribute_id}}",
+              "host": [
+                "{{base_api}}"
+              ],
+              "path": [
+                "attributes",
+                "{{attribute_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
