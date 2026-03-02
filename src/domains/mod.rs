@@ -32,6 +32,18 @@ struct Domain {
     max_search_identity: i16,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+    attribute_configs: Vec<AttributeConfig>,
+}
+
+#[derive(Debug, Serialize)]
+struct DomainRow {
+    id: Uuid,
+    label: String,
+    country: String,
+    language: String,
+    max_search_identity: i16,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,6 +75,68 @@ struct AttributeConfigDto {
     mandatory_in_search: bool,
 }
 
+#[derive(Debug, Serialize)]
+struct AttributeConfig {
+    attribute_id: Uuid,
+    search_weight: i16,
+    search_index: i16,
+    appears_in_banner: bool,
+    mandatory_in_form: bool,
+    appears_in_search: bool,
+    mandatory_in_search: bool,
+}
+
+async fn fetch_domain(
+    db: &sqlx::PgPool,
+    id: Uuid,
+) -> Result<Domain, ApiError> {
+    let row = sqlx::query_as!(
+        DomainRow,
+        r#"
+        SELECT id, label, country, language, max_search_identity, created_at, updated_at
+        FROM domains
+        WHERE id = $1
+        "#,
+        id
+    )
+        .fetch_optional(db)
+        .await
+        .api_err()?
+        .ok_or(ApiError::NotFound)?;
+
+    let configs = sqlx::query_as!(
+        AttributeConfig,
+        r#"
+        SELECT
+          attribute_id,
+          search_weight,
+          search_index,
+          appears_in_banner,
+          mandatory_in_form,
+          appears_in_search,
+          mandatory_in_search
+        FROM attribute_configs
+        WHERE domain_id = $1
+        ORDER BY search_index
+        "#,
+        id
+    )
+        .fetch_all(db)
+        .await
+        .api_err()?; // returns [] if none
+
+    Ok(Domain {
+        id: row.id,
+        label: row.label,
+        country: row.country,
+        language: row.language,
+        max_search_identity: row.max_search_identity,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        attribute_configs: configs,
+    })
+}
+
 async fn create_domain(
     State(state): State<AppState>,
     Json(dto): Json<CreateDomainDto>,
@@ -70,7 +144,7 @@ async fn create_domain(
     let mut tx = state.db.begin().await.api_err()?;
 
     let domain = sqlx::query_as!(
-        Domain,
+        DomainRow,
         r#"
         INSERT INTO domains (label, country, language, max_search_identity)
         VALUES ($1, $2, $3, $4)
@@ -91,6 +165,7 @@ async fn create_domain(
 
     tx.commit().await.api_err()?;
 
+    let domain = fetch_domain(&state.db, domain.id).await?;
     Ok((StatusCode::CREATED, Json(domain)))
 }
 
@@ -98,26 +173,12 @@ async fn get_domain(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Domain>, ApiError> {
-    let p = sqlx::query_as!(
-        Domain,
-        r#"
-        SELECT id, label, country, language, max_search_identity, created_at, updated_at
-        FROM domains
-        WHERE id = $1
-        "#,
-        id
-    )
-    .fetch_optional(&state.db)
-    .await
-    .api_err()?
-    .ok_or(ApiError::NotFound)?;
-
-    Ok(Json(p))
+    Ok(Json(fetch_domain(&state.db, id).await?))
 }
 
-async fn list_domains(State(state): State<AppState>) -> Result<Json<Vec<Domain>>, ApiError> {
-    let items = sqlx::query_as!(
-        Domain,
+async fn list_domains(State(state): State<AppState>) -> Result<Json<Vec<DomainRow>>, ApiError> {
+    let domain_rows = sqlx::query_as!(
+        DomainRow,
         r#"
         SELECT id, label, country, language, max_search_identity, created_at, updated_at
         FROM domains
@@ -129,7 +190,7 @@ async fn list_domains(State(state): State<AppState>) -> Result<Json<Vec<Domain>>
     .await
     .api_err()?;
 
-    Ok(Json(items))
+    Ok(Json(domain_rows))
 }
 
 async fn update_domains(
@@ -139,8 +200,8 @@ async fn update_domains(
 ) -> Result<Json<Domain>, ApiError> {
     let mut tx = state.db.begin().await.api_err()?;
 
-    let domain = sqlx::query_as!(
-        Domain,
+    sqlx::query_as!(
+        DomainRow,
         r#"
         UPDATE domains
         SET
@@ -175,6 +236,7 @@ async fn update_domains(
 
     tx.commit().await.api_err()?;
 
+    let domain = fetch_domain(&state.db, id).await?;
     Ok(Json(domain))
 }
 
